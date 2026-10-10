@@ -87,7 +87,7 @@ func NewManager(cfg *config.Config, runner Runner) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{cfg: cfg, tasks: map[string]*Task{}, queue: make(chan *Task, cfg.MaxActiveTasks+cfg.QueueSize), ctx: ctx, cancel: cancel}
 	if runner == nil {
-		engine := probe.NewEngine(cfg.MaxConcurrency)
+		engine := probe.NewEngineWithConfig(cfg)
 		runner = func(ctx context.Context, nodes []*core.ProxyNode, n int, emit func(*probe.ProbeResult)) error {
 			k, e := core.StartKernelForNodes(ctx, nodes)
 			if e != nil {

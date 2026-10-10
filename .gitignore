@@ -5,6 +5,7 @@
 /secrets/
 /.nodepure-tmp/
 *.hash
+*.key
 *.log
 *.csv
 nodepure_filtered.yaml

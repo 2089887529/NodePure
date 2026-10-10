@@ -4,6 +4,7 @@ bin
 secrets
 .nodepure-tmp
 *.hash
+*.key
 .env*
 *.log
 *.csv

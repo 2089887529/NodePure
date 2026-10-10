@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const state={mode:'url',task:null,results:new Map(),filter:'all',page:1,stream:null,poll:null,frame:null,lastEvent:0,counts:{alive:0,res:0,ai:0,gpt:0,claude:0,pure:0,latSum:0,latCount:0}};
+const state={mode:'url',task:null,results:new Map(),filter:'all',page:1,stream:null,poll:null,frame:null,lastEvent:0,counts:{alive:0,res:0,ai:0,gpt:0,claude:0,pure:0,rated:0,scoreSum:0,latSum:0,latCount:0}};
 const labels={queued:'排队中',running:'检测中',completed:'检测完成',failed:'检测失败',canceled:'已取消'};
 const terminal=s=>['completed','failed','canceled'].includes(s);
 const statusLabel=s=>({ok:'网页连通',restricted:'受限/验证页',rate_limited:'限流',timeout:'超时',error:'请求失败',unknown:'未知'}[s]||'未知');
@@ -25,17 +25,19 @@ $('logout').addEventListener('click',async()=>{try{await post('/api/auth/logout'
 function switchMode(mode){state.mode=mode;$('url').disabled=mode!=='url';$('content').disabled=mode!=='text';for(const id of ['url','text']){$(id+'Tab').classList.toggle('active',id===mode);$(id+'Tab').setAttribute('aria-selected',String(id===mode));$(id+'Pane').hidden=id!==mode;}}
 $('urlTab').addEventListener('click',()=>switchMode('url'));$('textTab').addEventListener('click',()=>switchMode('text'));
 $('demo').addEventListener('click',()=>{switchMode('text');$('content').value='proxies:\n  - name: 格式示例（需要替换）\n    type: ss\n    server: example.com\n    port: 443\n    cipher: aes-128-gcm\n    password: replace-with-your-node-password\n';message('这是配置格式示例，需要替换为你的真实节点才能连接。');});
-function reset(task){stopConnections();state.task=task;state.results.clear();state.lastEvent=0;state.filter='all';state.page=1;state.counts={alive:0,res:0,ai:0,gpt:0,claude:0,pure:0,latSum:0,latCount:0};for(const b of $('filters').querySelectorAll('button'))b.classList.toggle('active',b.dataset.filter==='all');$('progress').hidden=false;$('summary').hidden=false;$('results').hidden=false;$('grid').replaceChildren();$('progressDetail').textContent='';render();}
+function reset(task){stopConnections();state.task=task;state.results.clear();state.lastEvent=0;state.filter='all';state.page=1;state.counts={alive:0,res:0,ai:0,gpt:0,claude:0,pure:0,rated:0,scoreSum:0,latSum:0,latCount:0};for(const b of $('filters').querySelectorAll('button'))b.classList.toggle('active',b.dataset.filter==='all');$('progress').hidden=false;$('summary').hidden=false;$('results').hidden=false;$('grid').replaceChildren();$('progressDetail').textContent='';render();}
 $('checkForm').addEventListener('submit',async e=>{
  e.preventDefault();if(state.task&&!terminal(state.task.status))return;
  const data={url:state.mode==='url'?$('url').value.trim():'',content:state.mode==='text'?$('content').value.trim():'',concurrency:Number($('concurrency').value)};
  if(!data.url&&!data.content){message('请输入订阅链接或节点配置。');return;}
  $('start').disabled=true;message('');try{const result=await post('/api/check',data);reset({id:result.task_id,total:result.total_nodes,completed:0,status:result.status});saved.set('nodepure_task',result.task_id);connect();refreshHistory();}catch(e){$('start').disabled=false;message(e.message);}
 });
-function contribution(item,sign){if(!item.success)return;const c=state.counts;c.alive+=sign;const p=item.purity,s=item.services;if(p?.ip_type==='residential')c.res+=sign;if(p?.verified&&p.purity_score>=80)c.pure+=sign;if(s?.chatgpt==='ok')c.gpt+=sign;if(s?.claude==='ok')c.claude+=sign;if(s?.chatgpt==='ok'||s?.claude==='ok')c.ai+=sign;if(item.latency?.http_rtt>=0){c.latSum+=sign*item.latency.http_rtt;c.latCount+=sign;}}
+function hasScore(p){return p?.verified===true&&Number.isInteger(p.purity_score)&&Number.isInteger(p.fraud_score)&&p.purity_score>=0&&p.purity_score<=100&&p.fraud_score>=0&&p.fraud_score<=100&&p.purity_score+p.fraud_score===100;}
+function contribution(item,sign){if(!item.success)return;const c=state.counts;c.alive+=sign;const p=item.purity,s=item.services;if(p?.type_verified&&p.ip_type==='residential')c.res+=sign;if(hasScore(p)){c.rated+=sign;c.scoreSum+=sign*p.purity_score;if(p.purity_score>=80)c.pure+=sign;}if(s?.chatgpt==='ok')c.gpt+=sign;if(s?.claude==='ok')c.claude+=sign;if(s?.chatgpt==='ok'||s?.claude==='ok')c.ai+=sign;if(item.latency?.http_rtt>=0){c.latSum+=sign*item.latency.http_rtt;c.latCount+=sign;}}
 function ingest(item){const old=state.results.get(item.node_id);if(old)contribution(old,-1);state.results.set(item.node_id,item);contribution(item,1);}
 function scheduleRender(){if(state.frame!==null)return;state.frame=requestAnimationFrame(()=>{state.frame=null;render();});}
-function matches(r){if(state.filter==='all')return true;if(!r.success)return false;switch(state.filter){case 'res':return r.purity?.ip_type==='residential';case 'pure':return r.purity?.verified&&r.purity.purity_score>=80;case 'chatgpt':return r.services?.chatgpt==='ok';case 'claude':return r.services?.claude==='ok';default:return false;}}
+function matches(r){if(state.filter==='all')return true;if(!r.success)return false;switch(state.filter){case 'res':return r.purity?.type_verified&&r.purity.ip_type==='residential';case 'pure':return hasScore(r.purity)&&r.purity.purity_score>=80;case 'chatgpt':return r.services?.chatgpt==='ok';case 'claude':return r.services?.claude==='ok';default:return false;}}
+function sortedResults(items,order){return items.sort((a,b)=>{if(order==='default')return 0;const value=r=>order==='latency'?(r.success&&Number.isFinite(r.latency?.http_rtt)&&r.latency.http_rtt>=0?r.latency.http_rtt:Infinity):(r.success&&hasScore(r.purity)?r.purity.fraud_score:Infinity);const x=value(a),y=value(b);return x===y?0:x<y?-1:1;});}
 function element(tag,text,className){const n=document.createElement(tag);if(text!==undefined)n.textContent=String(text);if(className)n.className=className;return n;}
 function detail(dl,label,value){const row=element('div');row.append(element('dt',label),element('dd',value||'—'));dl.append(row);return row;}
 function card(r){
@@ -44,17 +46,22 @@ function card(r){
  const dl=element('dl'),ip=r.ip_info||{},p=r.purity||{},s=r.services||{};
  const row=detail(dl,'出口 IP',ip.ip);const copy=element('button',ip.ip||'—','copy');copy.type='button';copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(ip.ip);message('出口 IP 已复制');}catch{message('当前浏览器不能复制，请手动选择出口 IP。');}});row.querySelector('dd').replaceChildren(copy);
  detail(dl,'地区',[ip.country,ip.city].filter(Boolean).join(' · '));detail(dl,'运营商',ip.isp);detail(dl,'ASN',ip.asn);el.append(dl);
- const chips=element('div',undefined,'chips');chips.append(element('span',p.ip_type_label||'类型未知','chip'),element('span',p.native_label||'原生性未知','chip'),element('span',p.verified&&p.purity_score!=null?`风险参考分 ${p.purity_score}`:'风险未测量','chip'));
+ const score=element('div',undefined,'score-panel');
+ if(hasScore(p)){score.className+=' '+(p.fraud_score<=25?'score-low':p.fraud_score<=50?'score-medium':'score-high');const quality=element('div');quality.append(element('span','纯净度 · 越高越好'),element('strong',`${p.purity_score} / 100`));const risk=element('div');risk.append(element('span','风险分 · 越低越好'),element('strong',`${p.fraud_score} / 100`));score.append(quality,risk);score.append(element('p',`${p.risk_label||'风险参考'} · 等级 ${p.grade||'—'}`));}
+ else{score.append(element('strong','评分暂不可用'),element('p',p.reason||'风险未测量'));}
+ el.append(score);el.append(element('p',`评分来源 ${p.source||'未接入'}${p.source_at?' · '+new Date(p.source_at).toLocaleString():''}${p.cached?' · 缓存':''}`,'source'));
+ const flags={proxy:'代理',vpn:'VPN',tor:'Tor',hosting:'机房',anonymous:'匿名出口',compromised:'受入侵',scraper:'爬虫'};const detected=Object.entries(flags).filter(([key])=>p.flags?.[key]===true).map(([,name])=>name);if(detected.length)el.append(element('p','数据源标记：'+detected.join(' · '),'source'));
+ const chips=element('div',undefined,'chips');chips.append(element('span',p.ip_type_label||'类型未知','chip'),element('span',p.native_label||'原生性未知','chip'));
  const latency=r.latency?.http_rtt;chips.append(element('span',latency>=0?`HTTP ${latency} ms`:'HTTP 测量失败','chip'));el.append(chips);
  const services=element('div',undefined,'chips services');for(const [key,name] of [['chatgpt','GPT'],['claude','Claude'],['youtube','YouTube'],['google','Google']]){services.append(element('span',`${name} · ${statusLabel(s[key])}`,s[key]==='ok'?'chip ok':'chip'));}el.append(services);
  el.append(element('p',`来源 ${ip.source||'未知'} · ${ip.source_at?new Date(ip.source_at).toLocaleString():'未知时间'}${ip.lookup_error?' · 元信息查询不完整':''}`,'source'));return el;
 }
 function render(){
  const task=state.task,c=state.counts;if(!task)return;const pct=task.total?Math.min(100,Math.round(task.completed/task.total*100)):0;$('bar').value=pct;$('percent').textContent=pct+'%';$('status').textContent=labels[task.status]||task.status;$('progressDetail').textContent=task.error||`${task.completed} / ${task.total} 个节点已完成`;$('start').disabled=!terminal(task.status);$('cancel').hidden=terminal(task.status);
- $('total').textContent=`${task.completed} / ${task.total}`;$('alive').textContent=c.alive;$('residential').textContent=c.res;$('ai').textContent=c.ai;$('latency').textContent=c.latCount?Math.round(c.latSum/c.latCount)+' ms':'—';
- const counts={all:state.results.size,res:c.res,pure:c.pure,chatgpt:c.gpt,claude:c.claude};const filterNames={all:'全部',res:'住宅 ISP 线索',pure:'风险评分 ≥80',chatgpt:'GPT 网页',claude:'Claude 网页'};
+ $('total').textContent=`${task.completed} / ${task.total}`;$('alive').textContent=c.alive;$('residential').textContent=c.res;$('ai').textContent=c.ai;$('latency').textContent=c.latCount?Math.round(c.latSum/c.latCount)+' ms':'—';$('rated').textContent=`${c.rated} / ${c.alive}`;$('averageScore').textContent=c.rated?Math.round(c.scoreSum/c.rated)+' / 100':'—';
+ const counts={all:state.results.size,res:c.res,pure:c.pure,chatgpt:c.gpt,claude:c.claude};const filterNames={all:'全部',res:'住宅 IP',pure:'纯净度 ≥80',chatgpt:'GPT 网页',claude:'Claude 网页'};
  for(const b of $('filters').querySelectorAll('button')){b.textContent=`${filterNames[b.dataset.filter]} (${counts[b.dataset.filter]})`;}
- const filtered=[...state.results.values()].filter(matches),pages=Math.max(1,Math.ceil(filtered.length/50));state.page=Math.min(state.page,pages);$('grid').replaceChildren(...filtered.slice((state.page-1)*50,state.page*50).map(card));$('pageText').textContent=`${state.page} / ${pages} 页 · ${filtered.length} 个节点`;$('previous').disabled=state.page<=1;$('next').disabled=state.page>=pages;$('emptyResults').hidden=filtered.length>0;
+ const filtered=sortedResults([...state.results.values()].filter(matches),$('sort').value),pages=Math.max(1,Math.ceil(filtered.length/50));state.page=Math.min(state.page,pages);$('grid').replaceChildren(...filtered.slice((state.page-1)*50,state.page*50).map(card));$('pageText').textContent=`${state.page} / ${pages} 页 · ${filtered.length} 个节点`;$('previous').disabled=state.page<=1;$('next').disabled=state.page>=pages;$('emptyResults').hidden=filtered.length>0;
 }
 async function syncSnapshot(id=state.task?.id){if(!id)return;const snapshot=await json('/api/task/'+encodeURIComponent(id));if(state.task?.id!==id)return;if(snapshot.completed>=state.task.completed&&(!terminal(state.task.status)||terminal(snapshot.status)))state.task={...snapshot,results:undefined};for(const r of snapshot.results||[])ingest(r);scheduleRender();if(terminal(state.task.status)){stopConnections();refreshHistory();}}
 function connect(){
@@ -66,6 +73,7 @@ function connect(){
 $('cancel').addEventListener('click',async()=>{if(!state.task)return;try{await post('/api/task/'+state.task.id+'/cancel',{});await syncSnapshot();}catch(e){message(e.message);}});
 for(const b of $('filters').querySelectorAll('button'))b.addEventListener('click',()=>{state.filter=b.dataset.filter;state.page=1;for(const other of $('filters').querySelectorAll('button'))other.classList.toggle('active',other===b);render();});
 $('previous').addEventListener('click',()=>{state.page--;render();});$('next').addEventListener('click',()=>{state.page++;render();});
+$('sort').addEventListener('change',()=>{state.page=1;render();});
 async function download(response,name){const blob=await response.blob(),url=URL.createObjectURL(blob),link=element('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('exportClash').addEventListener('click',async()=>{if(!state.task)return;const ids=[...state.results.values()].filter(r=>matches(r)&&r.success).map(r=>r.node_id);if(!ids.length){message('当前筛选没有可导出的节点。');return;}try{const r=await request('/api/export/clash',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_id:state.task.id,node_ids:ids,min_score:state.filter==='pure'?80:0})});await download(r,'nodepure_filtered.yaml');}catch(e){message(e.message);}});
 $('exportCSV').addEventListener('click',async()=>{if(!state.task)return;try{await download(await request('/api/export/csv/'+state.task.id),'nodepure_report.csv');}catch(e){message(e.message);}});

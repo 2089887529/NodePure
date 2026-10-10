@@ -3,6 +3,7 @@ package probe
 import (
 	"context"
 	"fmt"
+	"github.com/2089887529/NodePure/pkg/config"
 	"github.com/2089887529/NodePure/pkg/core"
 	"sync"
 	"time"
@@ -31,13 +32,23 @@ type ProgressEvent struct {
 	Status    string       `json:"status,omitempty"`
 	Error     string       `json:"error,omitempty"`
 }
-type Engine struct{ slots chan struct{} }
+type Engine struct {
+	slots      chan struct{}
+	reputation *ReputationChecker
+}
 
 func NewEngine(max int) *Engine {
 	if max < 1 {
 		max = 1
 	}
-	return &Engine{slots: make(chan struct{}, max)}
+	return &Engine{slots: make(chan struct{}, max), reputation: NewReputationChecker(config.Global)}
+}
+func NewEngineWithConfig(cfg *config.Config) *Engine {
+	max := cfg.MaxConcurrency
+	if max < 1 {
+		max = 1
+	}
+	return &Engine{slots: make(chan struct{}, max), reputation: NewReputationChecker(cfg)}
 }
 func (e *Engine) Run(ctx context.Context, nodes []*core.ProxyNode, concurrency int, emit func(*ProbeResult)) {
 	if ctx.Err() != nil {
@@ -75,7 +86,7 @@ func (e *Engine) Run(ctx context.Context, nodes []*core.ProxyNode, concurrency i
 						<-e.slots
 						return
 					}
-					res := probeSingleNode(ctx, n)
+					res := probeSingleNode(ctx, n, e.reputation)
 					<-e.slots
 					emit(res)
 				}
@@ -96,7 +107,7 @@ dispatch:
 func Failure(node *core.ProxyNode, reason string) *ProbeResult {
 	return &ProbeResult{NodeID: node.ID, NodeName: node.Name, NodeType: node.Type, Error: reason, CompletedAt: time.Now().UTC().Format(time.RFC3339)}
 }
-func probeSingleNode(parent context.Context, node *core.ProxyNode) *ProbeResult {
+func probeSingleNode(parent context.Context, node *core.ProxyNode, reputation *ReputationChecker) *ProbeResult {
 	ctx, cancel := context.WithTimeout(parent, 25*time.Second)
 	defer cancel()
 	res := Failure(node, "")
@@ -114,8 +125,15 @@ func probeSingleNode(parent context.Context, node *core.ProxyNode) *ProbeResult 
 	}
 	res.Success = true
 	res.IPInfo = info
-	res.Purity = AnalyzePurity(info)
-	res.Services, res.Latency = CheckServices(ctx, client)
+	type webResults struct {
+		services *ServiceStatus
+		latency  *LatencyMetrics
+	}
+	web := make(chan webResults, 1)
+	go func() { s, m := CheckServices(ctx, client); web <- webResults{s, m} }()
+	res.Purity = reputation.Analyze(ctx, client, info)
+	w := <-web
+	res.Services, res.Latency = w.services, w.latency
 	res.CompletedAt = time.Now().UTC().Format(time.RFC3339)
 	return res
 }

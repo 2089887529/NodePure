@@ -4,7 +4,19 @@
 
 A self-hosted Go web application that starts isolated Mihomo instances to inspect proxy exit IPs, IP metadata, HTTP latency, and website connectivity. The frontend is embedded and has no CDN or Node.js build dependency.
 
-**Measurement limits:** No verified commercial fraud-score source is configured. Risk scores, native-IP status and Anycast are unknown. ISP names provide heuristics only. ChatGPT/Claude/YouTube tests measure webpage HTTP connectivity, not API access, account eligibility, regional playback or service unlocks. Results are observations at a particular time.
+IP reputation scoring defaults to [proxycheck.io v3](https://proxycheck.io/api/) without requiring a key. Cards show raw risk (0–100, lower is better), purity (100 minus risk, higher is better), grade, source, timestamp and detection flags. Scores support sorting, threshold filtering and CSV provenance export.
+
+**Measurement limits:** Provider models differ; scores need not match IPCheck or IPPure and do not guarantee account eligibility. Failed, missing, null or out-of-range scores remain unknown, never zero. ISP names are hints; residential filtering requires an explicit provider classification. Native-IP status remains unknown when unavailable. Website HTTP tests do not establish API access, regional playback or service unlocks.
+
+## Reputation configuration
+
+`REPUTATION_PROVIDER=proxycheck` uses explicit-IP v3 queries pinned to `24-June-2026`, directly from the server, with `tag=0` (query tagging disabled). Exit IPs are sent to the third-party service. Official [free quotas](https://proxycheck.io/pricing/) currently allow 100 daily unregistered queries or 1000 with a free registered key. Optional `PROXYCHECK_API_KEY` or `PROXYCHECK_API_KEY_FILE` supplies your own key; choose only one. Keys are excluded from frontend responses and errors. Keep files private and outside Git, e.g. `secrets/proxycheck.key`.
+
+`REPUTATION_DAILY_LIMIT` defaults to 100 without a key or 1000 with one; adjust to your actual plan (range 1–100000). This is a process-local UTC daily budget; other applications may consume the same provider quota. Restarting does not reset provider quotas. Requests are limited to two concurrent queries and two starts per second, with one-hour successful and one-minute failed IP caches. Proxy exits are never rotated to evade limits.
+
+Grades use raw risk: A 0–25, B 26–50, C 51–75, D 76–100. Purity ≥80 means risk ≤20. JSON `verified` means a valid provider score matched the observed IP, not an independent reputation audit; `type_verified` tracks explicit network classification separately.
+
+For authorized use, `REPUTATION_PROVIDER=ippure` selects the [IPPure current-exit API](https://ippure.com/MyIP-Info-API) through each target node. Responses must match that node's observed exit IP; HTTP 403, quota errors, mismatches and unsupported IPv6 remain unknown. IPCheck/IPPure informed score direction and source presentation; their UI, private algorithms and keys are not copied. Set `REPUTATION_PROVIDER=off` to disable reputation queries.
 
 Supports Clash YAML, Base64 subscriptions and common SS, Trojan, VMess, VLESS, Hysteria2, HTTP(S) and SOCKS5 URIs, including common TLS/SNI/WS/gRPC/Reality parameters. Unsupported transports are reported; use Clash YAML for advanced protocol settings.
 

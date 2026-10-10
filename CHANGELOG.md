@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add real proxycheck.io v3 reputation scores with raw risk, complementary purity, source/time/status, bounded daily budget, shared cache and optional private key file; include an exit-bound IPPure adapter.
+- Add score coverage, average purity, score sorting, explicit residential classification, correct purity ≥80 filtering and CSV score provenance; unavailable scores remain null.
+
 - Remove fabricated fraud/purity numbers and unsupported native/Anycast claims; show uncertainty and label ISP heuristics.
 - Join service checks before publishing immutable results; independently validate HTTP statuses and Google's 204 endpoint; separate HTTPS RTT and connection/TLS timing.
 - Add task ownership, local-default binding, password-file login for LAN access, session revocation, CSRF/Host/CSP protections and redacted result serialization.

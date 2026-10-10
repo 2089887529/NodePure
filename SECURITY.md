@@ -11,6 +11,7 @@ NodePure is intended for trusted personal/admin use. Do not expose an unrestrict
 - Fetching subscription URLs checks HTTP(S), hostname/IP, every DNS answer, redirects and size. The checked IP is dialed directly. `SUBSCRIPTION_ALLOWLIST` deliberately permits private destinations by exact hostname; DNS names on the allowlist trust all resolved addresses. Do not use broad exceptions.
 - Host allowlisting, same-origin checks, strict HttpOnly cookies and a custom mutation header mitigate CSRF and DNS rebinding. The UI creates text nodes for untrusted data and uses self-hosted scripts/styles with a restrictive CSP. CSV formula prefixes are escaped.
 - Requests/tasks/nodes/history/downloads/log buffers are bounded. Two active kernels and the shared node concurrency budget prevent per-request unbounded probing; authentication attempt throttling is local and is not a substitute for an internet-facing gateway.
+- Exit IPs are queried against third-party metadata and reputation services. Default explicit-IP reputation queries use the server connection, bounded cache/rate/budget and no redirect following; they do not rotate proxy exits to evade quotas. Set `REPUTATION_PROVIDER=off` to disable reputation requests. API keys are service-side secrets; keep their files private and excluded from Git and image contexts. Valid scores reflect the chosen provider model, not independent guarantees.
 
 ## Reverse proxy
 

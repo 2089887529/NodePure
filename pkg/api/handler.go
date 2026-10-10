@@ -254,7 +254,7 @@ func (s *Server) exportClash(c *gin.Context) {
 		if req.MinScore > 0 && (res.Purity == nil || !res.Purity.Verified || res.Purity.PurityScore == nil || *res.Purity.PurityScore < req.MinScore) {
 			continue
 		}
-		if req.OnlyRes && (res.Purity == nil || !res.Purity.Verified || res.Purity.IPType != "residential") {
+		if req.OnlyRes && (res.Purity == nil || !res.Purity.TypeVerified || res.Purity.IPType != "residential") {
 			continue
 		}
 		if p := t.raw[res.NodeID]; p != nil {
@@ -291,9 +291,9 @@ func (s *Server) exportCSV(c *gin.Context) {
 	state := t.snapshot(true)
 	buf := &bytes.Buffer{}
 	w := csv.NewWriter(buf)
-	w.Write([]string{"节点名称", "协议", "连接", "出口IP", "国家", "城市", "ISP", "ASN", "类型线索", "原生性", "风险得分", "风险状态", "GPT网页", "Claude网页", "HTTP延迟ms", "元数据来源", "采样时间"})
+	w.Write([]string{"节点名称", "协议", "连接", "出口IP", "国家", "城市", "ISP", "ASN", "网络类型", "原生性", "纯净度_越高越好", "风险状态", "GPT网页", "Claude网页", "HTTP延迟ms", "元数据来源", "采样时间", "风险分_越低越好", "评分来源", "评分查询时间", "评分状态", "评分依据"})
 	for _, res := range state.Results {
-		row := make([]string, 17)
+		row := make([]string, 22)
 		row[0], row[1] = res.NodeName, res.NodeType
 		row[2] = "失败"
 		if res.Success {
@@ -307,6 +307,10 @@ func (s *Server) exportCSV(c *gin.Context) {
 			if p.Verified && p.PurityScore != nil {
 				row[10] = strconv.Itoa(*p.PurityScore)
 			}
+			if p.Verified && p.FraudScore != nil {
+				row[17] = strconv.Itoa(*p.FraudScore)
+			}
+			row[18], row[19], row[20], row[21] = p.Source, p.SourceAt, p.Status, p.Reason
 		}
 		if p := res.Services; p != nil {
 			row[12], row[13] = p.ChatGPT, p.Claude

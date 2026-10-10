@@ -5,24 +5,31 @@ import (
 )
 
 type PurityAnalysis struct {
-	IPType      string `json:"ip_type"`
-	IPTypeLabel string `json:"ip_type_label"`
-	Nativeness  string `json:"nativeness"`
-	NativeLabel string `json:"native_label"`
-	FraudScore  *int   `json:"fraud_score"`
-	PurityScore *int   `json:"purity_score"`
-	Grade       string `json:"grade"`
-	RiskLevel   string `json:"risk_level"`
-	RiskLabel   string `json:"risk_label"`
-	Reason      string `json:"reason"`
-	Confidence  string `json:"confidence"`
-	Verified    bool   `json:"verified"`
+	IPType       string          `json:"ip_type"`
+	IPTypeLabel  string          `json:"ip_type_label"`
+	Nativeness   string          `json:"nativeness"`
+	NativeLabel  string          `json:"native_label"`
+	FraudScore   *int            `json:"fraud_score"`
+	PurityScore  *int            `json:"purity_score"`
+	Grade        string          `json:"grade"`
+	RiskLevel    string          `json:"risk_level"`
+	RiskLabel    string          `json:"risk_label"`
+	Reason       string          `json:"reason"`
+	Confidence   string          `json:"confidence"`
+	Verified     bool            `json:"verified"`
+	TypeVerified bool            `json:"type_verified"`
+	Source       string          `json:"source"`
+	SourceURL    string          `json:"source_url"`
+	SourceAt     string          `json:"source_at"`
+	Status       string          `json:"status"`
+	Cached       bool            `json:"cached"`
+	Flags        map[string]bool `json:"flags,omitempty"`
 }
 
 // ASN/ISP hints are not evidence of reputation, native routing or residential use.
 // No measured risk score is fabricated when a reputation source is unavailable.
 func AnalyzePurity(info *IPInfo) *PurityAnalysis {
-	p := &PurityAnalysis{IPType: "unknown", IPTypeLabel: "类型未知", Nativeness: "unknown", NativeLabel: "原生性未知", Grade: "unknown", RiskLevel: "unknown", RiskLabel: "风险未测量", Confidence: "unknown", Reason: "未接入可验证的 IP 风险及原生性数据源"}
+	p := &PurityAnalysis{IPType: "unknown", IPTypeLabel: "类型未知", Nativeness: "unknown", NativeLabel: "原生性未知", Grade: "unknown", RiskLevel: "unknown", RiskLabel: "风险未测量", Confidence: "unknown", Status: "unavailable", Reason: "未取得有效的信誉评分；类型推测不能代替风险数据"}
 	if info == nil || info.ISP == "" && info.Org == "" {
 		return p
 	}
