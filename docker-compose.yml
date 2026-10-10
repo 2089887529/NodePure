@@ -1,0 +1,32 @@
+services:
+  nodepure:
+    build: .
+    image: nodepure:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8099:8099"
+    volumes:
+      - ./bin:/kernels:ro
+      - nodepure-secrets:/secrets:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,uid=10001,gid=10001,mode=0700
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    pids_limit: 128
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 4096
+  password:
+    profiles: [tools]
+    build: .
+    image: nodepure:local
+    command: ["--set-password", "/secrets/password.hash"]
+    volumes:
+      - nodepure-secrets:/secrets
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+volumes:
+  nodepure-secrets:

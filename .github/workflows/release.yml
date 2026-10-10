@@ -1,0 +1,33 @@
+name: Release artifacts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go test ./... && go vet ./...
+      - name: Build binaries and checksums
+        run: |
+          mkdir dist
+          for platform in linux/amd64 linux/arm64 windows/amd64 darwin/arm64; do
+            os=${platform%/*}; arch=${platform#*/}; ext=
+            if [ "$os" = windows ]; then ext=.exe; fi
+            GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "dist/nodepure-$os-$arch$ext" ./cmd/server
+          done
+          cp LICENSE README.md README_EN.md SECURITY.md dist/
+          cd dist && sha256sum nodepure-* > SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nodepure-${{ github.sha }}
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error

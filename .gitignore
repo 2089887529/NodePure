@@ -1,0 +1,14 @@
+/bin/
+/nodepure
+/nodepure.exe
+/password.hash
+/secrets/
+*.hash
+*.log
+*.csv
+nodepure_filtered.yaml
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db

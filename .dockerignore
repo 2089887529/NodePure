@@ -1,0 +1,11 @@
+.git
+.github
+bin
+secrets
+*.hash
+.env*
+*.log
+*.csv
+nodepure
+nodepure.exe
+nodepure_filtered.yaml
