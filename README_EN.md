@@ -19,7 +19,7 @@ go build -trimpath -o nodepure ./cmd/server
 ./nodepure
 ```
 
-Open `http://127.0.0.1:8099`. On Windows build with `-o nodepure.exe` and run `./nodepure.exe`. The default is loopback-only. Optional automatic download requires the trusted SHA-256 of the matching official v1.19.32 archive in `MIHOMO_SHA256`; no unchecked executable is downloaded.
+Open `http://127.0.0.1:8099`. On Windows build with `-o nodepure.exe` and run `./start.cmd` (`./start.ps1` is also provided). The script resolves paths relative to itself and creates a current-user-only `.nodepure-tmp` directory, supporting spaces/Unicode and environments that deny access to the OS temp directory. No PowerShell execution-policy changes are required. Alternatively create a private directory, set `NODEPURE_TEMP_DIR` to its absolute path, and run `./nodepure.exe` directly. Without an override the application tries OS temp, then user cache. The default is loopback-only. Optional automatic download requires the trusted SHA-256 of the matching official v1.19.32 archive in `MIHOMO_SHA256`; no unchecked executable is downloaded.
 
 Non-loopback binding requires a bcrypt file. Generate one without putting the password in command arguments, environment variables or shell history:
 
@@ -47,5 +47,7 @@ NODEPURE_TEST_MIHOMO=/absolute/path/to/mihomo go test ./pkg/core -run TestRealMi
 ```
 
 The real-kernel test uses only an isolated local fixture and skips explicitly if the binary is not configured. CI covers tests, races, formatting, vet, frontend checks and cross-platform compilation. The manual Release workflow uploads build artifacts and SHA-256 checksums for review; it does not automatically publish a release.
+
+Real subscription tests have run on Linux and Windows, including Windows paths containing spaces/Unicode and Windows-to-Linux LAN authentication, SSE, session isolation and exports. CI also runs native Windows Go tests. macOS and Linux ARM64 are compile-checked only; physical-machine runtime testing remains outstanding. Install the matching Mihomo binary on each new machine, and configure password-protected LAN binding before accessing it from another computer.
 
 Licensed under [MIT](LICENSE). Mihomo and other third-party components retain their own licenses. See [CONTRIBUTING.md](CONTRIBUTING.md).

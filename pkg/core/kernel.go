@@ -224,6 +224,30 @@ func checkSOCKS(ctx context.Context, node *ProxyNode) error {
 	}
 	return nil
 }
+
+// Some Windows policies deny executable access to the system temporary directory.
+// Keep each task isolated, and use the user's cache if the OS temp directory fails.
+func makeKernelTemp() (string, error) {
+	if root := config.Global.TempDir; root != "" {
+		dir, e := os.MkdirTemp(root, "nodepure-")
+		if e != nil {
+			return "", fmt.Errorf("cannot create private kernel directory; NODEPURE_TEMP_DIR must be an existing writable private directory")
+		}
+		return dir, nil
+	}
+	if dir, e := os.MkdirTemp("", "nodepure-"); e == nil {
+		return dir, nil
+	}
+	if cache, e := os.UserCacheDir(); e == nil {
+		root := filepath.Join(cache, "NodePure", "tmp")
+		if e = os.MkdirAll(root, 0700); e == nil {
+			if dir, e := os.MkdirTemp(root, "nodepure-"); e == nil {
+				return dir, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("cannot create private kernel directory; set NODEPURE_TEMP_DIR to an existing writable private directory")
+}
 func StartKernelForNodes(ctx context.Context, nodes []*ProxyNode) (*KernelInstance, error) {
 	if len(nodes) == 0 {
 		return nil, fmt.Errorf("no nodes")
@@ -232,7 +256,7 @@ func StartKernelForNodes(ctx context.Context, nodes []*ProxyNode) (*KernelInstan
 	if e != nil {
 		return nil, e
 	}
-	dir, e := os.MkdirTemp("", "nodepure-*")
+	dir, e := makeKernelTemp()
 	if e != nil {
 		return nil, e
 	}

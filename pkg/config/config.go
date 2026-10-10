@@ -12,7 +12,7 @@ import (
 type Config struct {
 	Host                                                          string
 	Port                                                          int
-	MihomoBin, MihomoSHA256, PasswordHash, PublicOrigin           string
+	MihomoBin, MihomoSHA256, PasswordHash, PublicOrigin, TempDir  string
 	AllowedHosts, SubscriptionAllowlist                           []string
 	MaxConcurrency, MaxNodes, MaxTasks, MaxActiveTasks, QueueSize int
 	MaxBodyBytes                                                  int64
@@ -47,6 +47,7 @@ func Load() (*Config, error) {
 		c.MihomoBin = s
 	}
 	c.MihomoSHA256 = os.Getenv("MIHOMO_SHA256")
+	c.TempDir = os.Getenv("NODEPURE_TEMP_DIR")
 	c.PublicOrigin = os.Getenv("NODEPURE_PUBLIC_ORIGIN")
 	if path := os.Getenv("NODEPURE_PASSWORD_HASH_FILE"); path != "" {
 		b, e := os.ReadFile(path)

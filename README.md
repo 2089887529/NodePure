@@ -26,7 +26,7 @@ go build -trimpath -o nodepure ./cmd/server
 ./nodepure
 ```
 
-Windows PowerShell 使用 `go build -trimpath -o nodepure.exe ./cmd/server` 和 `./nodepure.exe`。默认只监听 `http://127.0.0.1:8099`，本机模式自动签发浏览器会话。
+Windows PowerShell 使用 `go build -trimpath -o nodepure.exe ./cmd/server` 和 `./start.cmd`。启动脚本按脚本目录定位程序和内核，并创建仅当前用户可访问的 `.nodepure-tmp`；支持含空格和中文的路径，也避开部分 Windows 环境对系统临时目录的访问限制。另提供 `./start.ps1`；无需修改 PowerShell 执行策略。也可创建个人私有目录并设置 `$env:NODEPURE_TEMP_DIR` 后直接运行 `./nodepure.exe`。默认只监听 `http://127.0.0.1:8099`，本机模式自动签发浏览器会话。
 
 缺少内核时不会下载未经校验的可执行文件。可选自动下载仅支持固定 v1.19.32：设置 `MIHOMO_SHA256` 为对应官方压缩包的、经可信渠道核对的 SHA-256。名称为 `mihomo-<os>-<arch>-v1.19.32.gz`，Windows 为 `.zip`。哈希校验、大小限制、原子替换和下载互斥均开启；不要用尚未验证的下载文件自己计算哈希后冒充可信校验。
 
@@ -59,6 +59,7 @@ $env:NODEPURE_PASSWORD_HASH_FILE = './password.hash'
 | `NODEPURE_HOST`, `NODEPURE_PORT` | `127.0.0.1`, `8099` |
 | `MIHOMO_BIN` | `./bin/mihomo`，Windows 自动加 `.exe` |
 | `MIHOMO_SHA256` | 空；可选固定版本压缩包可信校验值 |
+| `NODEPURE_TEMP_DIR` | 空；优先系统临时目录，无法创建时尝试用户缓存；可指定已有的可写私有目录。Windows 启动脚本使用 `.nodepure-tmp` |
 | `NODEPURE_PASSWORD_HASH_FILE` | 空；非回环监听必填 |
 | `NODEPURE_ALLOWED_HOSTS` | 逗号分隔的精确域名，不含协议或端口 |
 | `NODEPURE_PUBLIC_ORIGIN` | 空；HTTPS 反向代理的完整来源，如 `https://nodes.example.com` |
@@ -95,6 +96,8 @@ NODEPURE_TEST_MIHOMO=/absolute/path/to/mihomo go test ./pkg/core -run TestRealMi
 ```
 
 GitHub Actions 检查 Go 测试、竞态、格式、静态分析、前端测试和多平台编译；手动 Release workflow 构建二进制与 SHA-256 清单为工作流附件，审查后再创建正式 Release。真实内核测试没有提供环境变量时明确跳过。
+
+已在 Linux 与 Windows 上完成真实订阅的端到端检测，并从 Windows 访问 Linux 独立实例验证登录、SSE、会话隔离和导出；Windows 测试包含空格及中文目录。CI 另运行 Windows 原生 Go 测试。macOS 和 Linux ARM64 已验证编译，尚未在对应实机运行。更换电脑时仍须安装匹配平台的 Mihomo；默认回环监听不能由其他电脑直接访问，局域网访问按上面的密码配置启动。
 
 ## 许可证
 

@@ -3,6 +3,7 @@
 /nodepure.exe
 /password.hash
 /secrets/
+/.nodepure-tmp/
 *.hash
 *.log
 *.csv
